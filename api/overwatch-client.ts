@@ -277,20 +277,22 @@ class OverwatchDemoClient {
         avgDuration: overview?.avgDuration || "0:00",
       }
 
-      // Map audience countries to geographic format
+      // Map audience countries to geographic format (daemon returns {code, count})
       const colors = ["#3B82F6", "#52a2ff", "#60a5fa", "#93c5fd", "#bfdbfe"]
       const geographic = (audience?.countries || []).slice(0, 5).map((c: any, idx: number) => ({
-        country: c.country || c.name,
-        code: c.code || c.countryCode,
+        country: c.country || c.name || c.code || "Unknown",
+        code: c.code || c.countryCode || "XX",
         count: c.count || c.visitors || 0,
         color: colors[idx % colors.length],
       }))
 
-      // Map audience devices
+      // Map audience devices (daemon returns array of {type, count})
+      const deviceArray = audience?.devices || []
+      const totalDevices = deviceArray.reduce((sum: number, d: any) => sum + (d.count || 0), 0) || 1
       const devices = {
-        desktop: audience?.devices?.desktop || 60,
-        mobile: audience?.devices?.mobile || 30,
-        tablet: audience?.devices?.tablet || 10,
+        desktop: Math.round(((deviceArray.find((d: any) => d.type === "desktop")?.count || 0) / totalDevices) * 100),
+        mobile: Math.round(((deviceArray.find((d: any) => d.type === "mobile")?.count || 0) / totalDevices) * 100),
+        tablet: Math.round(((deviceArray.find((d: any) => d.type === "tablet")?.count || 0) / totalDevices) * 100),
       }
 
       // Map performance metrics - calculate score from Web Vitals
