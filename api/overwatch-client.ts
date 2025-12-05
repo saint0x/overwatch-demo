@@ -27,6 +27,7 @@ class OverwatchDemoClient {
   private isInitialized = false
   private ws: WebSocket | null = null
   private reconnectTimeout: NodeJS.Timeout | null = null
+  private pingInterval: NodeJS.Timeout | null = null
   private subscribers = new Map<string, Set<(data: any) => void>>()
   private sdkInstance: any = null
   private session: SessionInfo = {
@@ -108,6 +109,7 @@ class OverwatchDemoClient {
 
       this.ws.onclose = () => {
         console.log("[Overwatch Demo] WebSocket closed")
+        this.stopPingInterval()
         this.reconnectTimeout = setTimeout(() => {
           console.log("[Overwatch Demo] Attempting reconnect...")
           this.connectWebSocket()
@@ -128,11 +130,17 @@ class OverwatchDemoClient {
 
       case "authenticated":
         console.log("[Overwatch Demo] Authenticated, project:", msg.projectId)
+        // Start heartbeat to keep connection alive
+        this.startPingInterval()
         // Subscribe to all data channels we need
         this.subscribeToChannel("realtime")
         this.subscribeToChannel("events")
         this.subscribeToChannel("geographic")
         this.subscribeToChannel("performance")
+        break
+
+      case "pong":
+        // Heartbeat acknowledged - connection is healthy
         break
 
       case "subscribed":
@@ -234,6 +242,24 @@ class OverwatchDemoClient {
           channel,
         }),
       )
+    }
+  }
+
+  private startPingInterval(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval)
+    }
+    this.pingInterval = setInterval(() => {
+      if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: "ping" }))
+      }
+    }, 15000)
+  }
+
+  private stopPingInterval(): void {
+    if (this.pingInterval) {
+      clearInterval(this.pingInterval)
+      this.pingInterval = null
     }
   }
 
@@ -405,6 +431,7 @@ class OverwatchDemoClient {
       this.sdkInstance.destroy()
     }
 
+    this.stopPingInterval()
     if (this.reconnectTimeout) {
       clearTimeout(this.reconnectTimeout)
     }
