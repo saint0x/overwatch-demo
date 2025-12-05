@@ -67,6 +67,7 @@ export interface RealtimeChannelData {
   pageviewsLastMinute: number
   clicksLastMinute: number
   errorsLastMinute: number
+  avgSessionDuration?: number // milliseconds
 }
 
 // Daemon's event channel payload

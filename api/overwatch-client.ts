@@ -142,10 +142,16 @@ class OverwatchDemoClient {
       case "realtime": {
         const realtimeData = msg.data as RealtimeChannelData
         if (realtimeData) {
+          // Format avgSessionDuration from ms to "M:SS" format
+          const durationMs = realtimeData.avgSessionDuration || 0
+          const minutes = Math.floor(durationMs / 60000)
+          const seconds = Math.floor((durationMs % 60000) / 1000)
+          const avgDurationFormatted = `${minutes}:${seconds.toString().padStart(2, '0')}`
+
           this.notifySubscribers("metrics", {
             activeUsers: realtimeData.activeUsersCount,
             pageViews: realtimeData.pageviewsLastMinute,
-            avgDuration: "2:34", // TODO: Get from stats endpoint
+            avgDuration: avgDurationFormatted,
           })
           // Also extract device breakdown from active sessions
           if (realtimeData.activeSessions?.length > 0) {

@@ -45,7 +45,7 @@
         "lucide-react": "^0.454.0",
         "next": "16.0.7",
         "next-themes": "^0.4.6",
-        "overwatch-sdk": "^0.0.5",
+        "overwatch-sdk": "0.0.6",
         "react": "19.2.0",
         "react-day-picker": "9.8.0",
         "react-dom": "19.2.0",
@@ -461,7 +461,7 @@
 
     "object-assign": ["object-assign@4.1.1", "", {}, "sha512-rJgTQnkUnH1sFw8yT6VSU3zD3sWmu6sZhIseY8VX+GRu3P6F7Fu+JNDoXfklElbLJSnc3FUQHVe4cU5hj+BcUg=="],
 
-    "overwatch-sdk": ["overwatch-sdk@0.0.5", "", {}, "sha512-FpBZKyzenbH34nbRNnUnWXnYCuzm8es4IYvjW0pjPp4HXBcuek+Q2l6NAPfm5XQBUj47CoHEmrwBqiI8iLubqA=="],
+    "overwatch-sdk": ["overwatch-sdk@0.0.6", "", {}, "sha512-r8swduhDwQRez1QK9GKduZuRCrIto646zKTHnihr2vwraKPejLEwyjNBuxksSxmoSlKmsqa9nJI/+FTKL1FPFQ=="],
 
     "picocolors": ["picocolors@1.1.1", "", {}, "sha512-xceH2snhtb5M9liqDsmEw56le376mTZkEX/jEb/RxNFyegNul7eNslCXP9FDj/Lcu0X8KEyMceP2ntpaHrDEVA=="],
 
