@@ -9,14 +9,15 @@
  * and their data is displayed back to them in real-time.
  */
 
-import type { RealtimeData, WebSocketMessage, SessionInfo } from "@/types/analytics"
-import {
-  generateRandomEvent,
-  getInitialMetrics,
-  getInitialDeviceStats,
-  getGeographicData,
-  getInitialPerformanceScore,
-} from "./mock-data"
+import type {
+  RealtimeData,
+  WebSocketMessage,
+  SessionInfo,
+  RealtimeChannelData,
+  EventChannelData,
+  GeographicChannelData,
+  PerformanceChannelData,
+} from "@/types/analytics"
 
 // We'll dynamically import the SDK to avoid SSR issues
 let OverwatchSDK: any = null
@@ -119,40 +120,102 @@ class OverwatchDemoClient {
     }
   }
 
-  private handleWebSocketMessage(data: WebSocketMessage) {
-    switch (data.type) {
+  private handleWebSocketMessage(msg: WebSocketMessage) {
+    switch (msg.type) {
+      case "connected":
+        console.log("[Overwatch Demo] WebSocket connected:", msg.message)
+        break
+
       case "authenticated":
-        console.log("[Overwatch Demo] Authenticated, project:", data.projectId)
+        console.log("[Overwatch Demo] Authenticated, project:", msg.projectId)
+        // Subscribe to all data channels we need
+        this.subscribeToChannel("realtime")
         this.subscribeToChannel("events")
         this.subscribeToChannel("geographic")
-        this.subscribeToChannel("realtime")
+        this.subscribeToChannel("performance")
         break
 
-      case "realtime":
-        this.notifySubscribers("metrics", {
-          activeUsers: data.activeUsers,
-          pageViews: data.eventsLast5Min,
-        })
+      case "subscribed":
+        console.log("[Overwatch Demo] Subscribed to channel:", msg.channel)
         break
 
-      case "event":
-        if (data.event) {
+      case "realtime": {
+        const realtimeData = msg.data as RealtimeChannelData
+        if (realtimeData) {
+          this.notifySubscribers("metrics", {
+            activeUsers: realtimeData.activeUsersCount,
+            pageViews: realtimeData.pageviewsLastMinute,
+            avgDuration: "2:34", // TODO: Get from stats endpoint
+          })
+          // Also extract device breakdown from active sessions
+          if (realtimeData.activeSessions?.length > 0) {
+            const deviceCounts = { desktop: 0, mobile: 0, tablet: 0 }
+            for (const session of realtimeData.activeSessions) {
+              const type = session.device?.toLowerCase() || "desktop"
+              if (type === "desktop") deviceCounts.desktop++
+              else if (type === "mobile") deviceCounts.mobile++
+              else if (type === "tablet") deviceCounts.tablet++
+              else deviceCounts.desktop++
+            }
+            const total = deviceCounts.desktop + deviceCounts.mobile + deviceCounts.tablet
+            if (total > 0) {
+              this.notifySubscribers("devices", {
+                desktop: Math.round((deviceCounts.desktop / total) * 100),
+                mobile: Math.round((deviceCounts.mobile / total) * 100),
+                tablet: Math.round((deviceCounts.tablet / total) * 100),
+              })
+            }
+          }
+        }
+        break
+      }
+
+      case "event": {
+        const eventData = msg.data as EventChannelData
+        if (eventData) {
           const formattedEvent = {
-            id: data.event.id,
-            city: data.event.location.city,
-            country: data.event.location.country,
-            action: data.event.eventType === "pageview" ? "viewed" : "clicked",
-            page: new URL(data.event.url).pathname || "/",
-            timestamp: data.event.timestamp,
+            id: eventData.eventId,
+            city: "", // Not available in event stream
+            country: eventData.country || "Unknown",
+            action: eventData.type === "pageview" ? "viewed" : eventData.type === "click" ? "clicked" : eventData.type,
+            page: eventData.pageUrl || "/",
+            timestamp: eventData.timestamp,
           }
           this.notifySubscribers("events", formattedEvent)
         }
         break
+      }
 
-      case "geographic":
-        if (data.locations) {
-          this.notifySubscribers("geographic", data.locations)
+      case "geographic": {
+        const geoData = msg.data as GeographicChannelData
+        if (geoData?.liveLocations) {
+          // Transform daemon format to frontend format
+          const colors = ["#3B82F6", "#52a2ff", "#60a5fa", "#93c5fd", "#bfdbfe"]
+          const formatted = geoData.liveLocations.map((loc, idx) => ({
+            country: loc.countryName,
+            code: loc.countryCode,
+            count: loc.activeCount,
+            color: colors[idx % colors.length],
+          }))
+          this.notifySubscribers("geographic", formatted)
         }
+        break
+      }
+
+      case "performance": {
+        const perfData = msg.data as PerformanceChannelData
+        if (perfData) {
+          this.notifySubscribers("performance", {
+            metricName: perfData.metricName,
+            value: perfData.value,
+            rating: perfData.rating,
+          })
+        }
+        break
+      }
+
+      case "error":
+        console.error("[Overwatch Demo] WebSocket error:", msg.code, msg.message)
         break
     }
   }
@@ -176,50 +239,92 @@ class OverwatchDemoClient {
   }
 
   private startMockDataStream() {
-    const metricsInterval = setInterval(() => {
-      this.notifySubscribers("metrics", {
-        activeUsers: Math.floor(Math.random() * 100) + 20,
-        pageViews: Math.floor(Math.random() * 50) + 1200,
-      })
-    }, 2000)
-
-    const eventInterval = setInterval(
-      () => {
-        this.notifySubscribers("events", generateRandomEvent())
-      },
-      Math.random() * 2000 + 1000,
-    )
-
-    const deviceInterval = setInterval(() => {
-      this.notifySubscribers("devices", {
-        desktop: Math.floor(Math.random() * 20) + 50,
-        mobile: Math.floor(Math.random() * 15) + 25,
-        tablet: Math.floor(Math.random() * 5) + 8,
-      })
-    }, 5000)
-
-    if (this.ws) {
-      this.ws.addEventListener(
-        "open",
-        () => {
-          clearInterval(metricsInterval)
-          clearInterval(eventInterval)
-          clearInterval(deviceInterval)
-        },
-        { once: true },
-      )
-    }
+    // No mock data - just notify that we're in loading/disconnected state
+    console.log("[Overwatch Demo] WebSocket disconnected, showing loading state")
+    // Notify subscribers with empty/loading state
+    this.notifySubscribers("connection", { connected: false })
   }
 
   async getSnapshot(): Promise<RealtimeData> {
     this.ensureInitialized()
 
-    return {
-      metrics: getInitialMetrics(),
-      events: [],
-      geographic: getGeographicData(),
-      devices: getInitialDeviceStats(),
-      performance: getInitialPerformanceScore(),
+    const baseUrl = "https://overwatch-daemon.fly.dev"
+    const headers: HeadersInit = {
+      "x-api-key": this.apiKey!,
+      "Content-Type": "application/json",
+    }
+
+    try {
+      // Fetch data from daemon REST endpoints in parallel
+      const [overviewRes, realtimeRes, audienceRes, performanceRes] = await Promise.all([
+        fetch(`${baseUrl}/stats/overview`, { headers }),
+        fetch(`${baseUrl}/stats/realtime`, { headers }),
+        fetch(`${baseUrl}/stats/audience`, { headers }),
+        fetch(`${baseUrl}/stats/performance`, { headers }),
+      ])
+
+      const [overview, realtime, audience, performance] = await Promise.all([
+        overviewRes.ok ? overviewRes.json() : null,
+        realtimeRes.ok ? realtimeRes.json() : null,
+        audienceRes.ok ? audienceRes.json() : null,
+        performanceRes.ok ? performanceRes.json() : null,
+      ])
+
+      // Map daemon response to frontend types
+      const metrics = {
+        activeUsers: realtime?.activeUsers || 0,
+        pageViews: overview?.pageViews || 0,
+        avgDuration: overview?.avgDuration || "0:00",
+      }
+
+      // Map audience countries to geographic format
+      const colors = ["#3B82F6", "#52a2ff", "#60a5fa", "#93c5fd", "#bfdbfe"]
+      const geographic = (audience?.countries || []).slice(0, 5).map((c: any, idx: number) => ({
+        country: c.country || c.name,
+        code: c.code || c.countryCode,
+        count: c.count || c.visitors || 0,
+        color: colors[idx % colors.length],
+      }))
+
+      // Map audience devices
+      const devices = {
+        desktop: audience?.devices?.desktop || 60,
+        mobile: audience?.devices?.mobile || 30,
+        tablet: audience?.devices?.tablet || 10,
+      }
+
+      // Map performance metrics - calculate score from Web Vitals
+      const perfMetrics = {
+        fcp: performance?.fcp?.value || 1.5,
+        lcp: performance?.lcp?.value || 2.5,
+        cls: performance?.cls?.value || 0.1,
+        fid: performance?.fid?.value || 100,
+      }
+      // Simple scoring: weight good metrics higher
+      const score = Math.round(
+        (perfMetrics.fcp < 1.8 ? 25 : perfMetrics.fcp < 3 ? 15 : 5) +
+        (perfMetrics.lcp < 2.5 ? 25 : perfMetrics.lcp < 4 ? 15 : 5) +
+        (perfMetrics.cls < 0.1 ? 25 : perfMetrics.cls < 0.25 ? 15 : 5) +
+        (perfMetrics.fid < 100 ? 25 : perfMetrics.fid < 300 ? 15 : 5)
+      )
+
+      return {
+        metrics,
+        events: [],
+        geographic,
+        devices,
+        performance: { score, metrics: perfMetrics },
+      }
+    } catch (error) {
+      console.error("[Overwatch Demo] Failed to fetch snapshot:", error)
+      // Return empty/loading state instead of mock data
+      return {
+        metrics: { activeUsers: 0, pageViews: 0, avgDuration: "0:00" },
+        events: [],
+        geographic: [],
+        devices: { desktop: 0, mobile: 0, tablet: 0 },
+        performance: { score: 0, metrics: { fcp: 0, lcp: 0, cls: 0, fid: 0 } },
+      }
     }
   }
 
@@ -261,7 +366,10 @@ class OverwatchDemoClient {
     return { ...this.session }
   }
 
-  subscribe(type: "metrics" | "events" | "devices" | "geographic", callback: (data: any) => void): () => void {
+  subscribe(
+    type: "metrics" | "events" | "devices" | "geographic" | "performance" | "connection",
+    callback: (data: any) => void
+  ): () => void {
     this.ensureInitialized()
 
     if (!this.subscribers.has(type)) {

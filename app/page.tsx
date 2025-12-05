@@ -40,12 +40,12 @@ export default function Page() {
     }
   }, [])
 
-  // Use hooks for all data
-  const metrics = useRealtimeMetrics()
+  // Use hooks for all data - destructure loading states
+  const { metrics, loading: metricsLoading } = useRealtimeMetrics()
   const events = useRealtimeEvents()
-  const deviceStats = useDeviceStats()
-  const geographic = useGeographicData()
-  const performance = usePerformanceScore()
+  const { devices: deviceStats, loading: devicesLoading } = useDeviceStats()
+  const { geographic, loading: geoLoading } = useGeographicData()
+  const { performance, loading: perfLoading } = usePerformanceScore()
 
   return (
     <div className="min-h-screen bg-background">
@@ -177,15 +177,19 @@ export default function Page() {
                   <h3 className="text-xl font-normal tracking-wide">Where Visitors Are From</h3>
                 </div>
                 <div className="space-y-4">
-                  {geographic.map((country) => (
-                    <div key={country.code} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className="w-2 h-2 rounded-full" style={{ backgroundColor: country.color }} />
-                        <span className="text-sm text-gray-300">{country.country}</span>
+                  {geoLoading || geographic.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">Loading geographic data...</div>
+                  ) : (
+                    geographic.map((country) => (
+                      <div key={country.code} className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-2 h-2 rounded-full" style={{ backgroundColor: country.color }} />
+                          <span className="text-sm text-gray-300">{country.country}</span>
+                        </div>
+                        <span className="text-sm font-medium tabular-nums">{country.count}</span>
                       </div>
-                      <span className="text-sm font-medium tabular-nums">{country.count}</span>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
               </Card>
             </div>

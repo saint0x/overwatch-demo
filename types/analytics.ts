@@ -45,27 +45,61 @@ export interface RealtimeData {
 }
 
 export interface WebSocketMessage {
-  type: "authenticated" | "realtime" | "event" | "geographic" | "subscribe"
+  type: "connected" | "authenticated" | "realtime" | "event" | "geographic" | "performance" | "subscribed" | "unsubscribed" | "pong" | "error"
   projectId?: string
-  activeUsers?: number
-  activeSessions?: number
-  eventsLast5Min?: number
-  event?: {
-    id: string
-    eventType: string
-    url: string
-    timestamp: number
-    location: { city: string; country: string }
-    device: { type: string; browser: string }
-  }
-  locations?: Array<{
-    city: string
-    country: string
+  message?: string
+  channel?: string
+  code?: string
+  timestamp?: number
+  // Realtime channel data
+  data?: RealtimeChannelData | EventChannelData | GeographicChannelData | PerformanceChannelData
+}
+
+// Daemon's realtime channel payload
+export interface RealtimeChannelData {
+  activeUsersCount: number
+  activeSessions: Array<{
+    sessionId: string
+    page: string
+    device: string
+  }>
+  eventsPerSecond: number
+  pageviewsLastMinute: number
+  clicksLastMinute: number
+  errorsLastMinute: number
+}
+
+// Daemon's event channel payload
+export interface EventChannelData {
+  eventId: string
+  type: string
+  timestamp: number
+  sessionId: string
+  pageUrl: string
+  country?: string
+  device?: string
+  browser?: string
+  data?: Record<string, unknown>
+}
+
+// Daemon's geographic channel payload
+export interface GeographicChannelData {
+  liveLocations: Array<{
+    countryCode: string
+    countryName: string
+    activeCount: number
     lat: number
     lng: number
-    activeUsers: number
   }>
-  channel?: string
+}
+
+// Daemon's performance channel payload
+export interface PerformanceChannelData {
+  metricName: "LCP" | "FID" | "CLS" | "TTFB" | "FCP" | "INP"
+  value: number
+  rating: "good" | "needs-improvement" | "poor"
+  pageUrl: string
+  timestamp: number
 }
 
 export interface SessionInfo {
